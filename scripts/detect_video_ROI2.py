@@ -8,7 +8,7 @@ import os
 # -----------------------------
 # Select video
 # -----------------------------
-video_path = "./videos/video5.mp4"
+video_path = "./videos/video2.mp4"
 
 video_name = os.path.splitext(os.path.basename(video_path))[0]
 roi_path = f"./calibrations/{video_name}_roi.json"
