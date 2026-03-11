@@ -1,8 +1,21 @@
-# Railway Vision Safety System
+#  🚆 Railway Vision Safety System
+AI-based obstacle detection for railway tracks using YOLOv8 and computer vision
+
+![Python](https://img.shields.io/badge/Python-3.8+-blue)
+![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-green)
+![OpenCV](https://img.shields.io/badge/OpenCV-ComputerVision-red)
 
 ## Project Overview
 
 The **Railway Vision Safety System** is a computer vision and AI-based project designed to detect obstacles on railway tracks. Utilizing state-of-the-art object detection models, the system monitors video feeds to identify objects that fall within a predefined track area, triggering alerts to help prevent collisions and ensure the safety of railway operations.
+
+## Tech Stack
+
+- Python
+- YOLOv8 (Ultralytics)
+- OpenCV
+- NumPy
+- Computer Vision
 
 ## Motivation
 
@@ -28,10 +41,11 @@ The system is trained to detect potential hazards, including:
 
 1. **Input Video** ➔ 2. **YOLOv8 Object Detection** ➔ 3. **Track ROI Filtering (Calibration)** ➔ 4. **Obstacle Alert Generation**
 
+
 ## Folder Structure
 
 ```text
-Railways/
+railway-vision-safety-system/
 │
 ├── calibrations/          # Stores JSON calibration files for defined track areas
 ├── dataset_tools/         # Scripts for preparing or manipulating datasets
@@ -57,8 +71,8 @@ This project relies on the following major dependencies:
 
 1. **Clone the repository** (if applicable):
    ```bash
-   git clone <repository_url>
-   cd Railways
+   git clone https://github.com/harshitmehra1/railway-vision-safety-system.git
+   cd railway-vision-safety-system
    ```
 
 2. **Create a virtual environment (optional but recommended)**:
@@ -91,13 +105,15 @@ Before running the detection on a new video, you must define the railway track a
 ### 1. Run Calibration
 First, calibrate the track area for your video:
 ```bash
-python scripts/calibrate.py --video videos/sample_video.mp4
+python scripts/calibrate_track_video.py
 ```
 
 ### 2. Running Detection
 Once calibrated, run the main detection script:
 ```bash
-python scripts/detect.py --video videos/sample_video.mp4
+python scripts/detect_video_ROI.py 
+# or
+python scripts/detect_video_ROI2.py
 ```
 The system will load the corresponding JSON calibration file and begin monitoring the video feed for obstacles intersecting the defined track zone.
 
@@ -107,6 +123,20 @@ When running the detection script, the system will display the video feed with t
 - The **Track ROI** drawn as a colored polygon.
 - **Bounding Boxes** around detected people, animals, and objects.
 - **Alert Visuals** (e.g., red bounding boxes or warning text) when an object enters the track area.
+
+## Demo
+
+![Demo](demo.gif)
+
+Example detections from the system:
+
+- Animal detected on railway track
+- Person detected inside track region
+- Object detected blocking track
+
+The system highlights obstacles entering the calibrated track region and triggers alerts in real time.
+
+
 
 ## Possible Improvements
 
