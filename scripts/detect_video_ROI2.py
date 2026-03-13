@@ -14,7 +14,7 @@ video_name = os.path.splitext(os.path.basename(video_path))[0]
 roi_path = f"./calibrations/{video_name}_roi.json"
 
 # -----------------------------
-# Load model
+# Load YOLO model
 # -----------------------------
 model = YOLO("./models/yolov8s.pt")
 
@@ -29,7 +29,26 @@ if not os.path.exists(roi_path):
 with open(roi_path) as f:
     roi_points = json.load(f)
 
-roi = np.array(roi_points, np.int32)
+roi_original = np.array(roi_points, np.int32)
+
+# -----------------------------
+# Expand ROI by 20%
+# -----------------------------
+def expand_roi(roi, scale=1.2):
+
+    roi = roi.astype(np.float32)
+    center = np.mean(roi, axis=0)
+
+    expanded_roi = []
+
+    for point in roi:
+        vector = point - center
+        new_point = center + vector * scale
+        expanded_roi.append(new_point)
+
+    return np.array(expanded_roi, dtype=np.int32)
+
+roi = expand_roi(roi_original, scale=1.2)
 
 # -----------------------------
 # Alert settings
@@ -41,17 +60,31 @@ animal_classes = ["dog","cat","cow","horse","sheep","elephant"]
 object_classes = ["backpack","suitcase","handbag","bag"]
 
 # -----------------------------
-# ROI check using center point
+# Detection memory
+# -----------------------------
+recent_detections = []
+
+# -----------------------------
+# ROI check
 # -----------------------------
 def box_intersects_roi(box, roi):
 
     x1,y1,x2,y2 = box
 
-    cx = int((x1 + x2) / 2)
-    cy = int((y1 + y2) / 2)
+    cx = int((x1+x2)/2)
+    cy = int((y1+y2)/2)
 
     return cv2.pointPolygonTest(roi, (cx,cy), False) >= 0
 
+# -----------------------------
+# Motion detection setup
+# -----------------------------
+previous_frame = None
+
+# -----------------------------
+# Frame counter
+# -----------------------------
+frame_count = 0
 
 # -----------------------------
 # Start video
@@ -70,47 +103,77 @@ while True:
     if not ret:
         break
 
-    results = model(frame, verbose=False)
+    frame_count += 1
+    object_detected = False
 
-    for box in results[0].boxes:
+    # -----------------------------
+    # YOLO detection (every 3 frames)
+    # -----------------------------
+    if frame_count % 3 == 0:
 
-        cls_id = int(box.cls[0])
-        name = model.names[cls_id]
-        conf = float(box.conf[0])
+        results = model(frame, verbose=False)
 
-        x1,y1,x2,y2 = map(int, box.xyxy[0])
+        for box in results[0].boxes:
 
-        # ignore train
-        if name == "train":
-            continue
+            cls_id = int(box.cls[0])
+            name = model.names[cls_id]
+            conf = float(box.conf[0])
 
-        # 🚫 Skip detections outside ROI
-        if not box_intersects_roi((x1,y1,x2,y2), roi):
-            continue
+            if conf < 0.45:
+                continue
 
-        color = (0,0,255)
-        label = name.upper()
+            x1,y1,x2,y2 = map(int, box.xyxy[0])
 
-        # classify groups
-        if name in animal_classes:
-            label = "ANIMAL"
+            if name == "train":
+                continue
 
-        elif name in object_classes:
-            label = "OBJECT"
+            if not box_intersects_roi((x1,y1,x2,y2), roi):
+                continue
 
-        elif name == "person":
-            label = "PERSON"
+            object_detected = True
 
-        current_time = time.time()
+            label = name.upper()
 
-        if label not in last_alert_time:
-            last_alert_time[label] = 0
+            if name in animal_classes:
+                label = "ANIMAL"
 
-        if current_time - last_alert_time[label] > alert_cooldown:
+            elif name in object_classes:
+                label = "OBJECT"
 
-            print(f"[ ALERT ] {label} detected on railway track ({name})")
+            elif name == "person":
+                label = "PERSON"
 
-            last_alert_time[label] = current_time
+            current_time = time.time()
+
+            if label not in last_alert_time:
+                last_alert_time[label] = 0
+
+            if current_time - last_alert_time[label] > alert_cooldown:
+
+                print(f"[ ALERT ] {label} detected on railway track ({name})")
+
+                last_alert_time[label] = current_time
+
+            recent_detections = [(x1,y1,x2,y2,label)]
+
+    # -----------------------------
+    # Draw detections
+    # -----------------------------
+    for det in recent_detections:
+
+        x1,y1,x2,y2,label = det
+
+        cv2.rectangle(frame,(x1,y1),(x2,y2),(0,0,255),2)
+
+        cv2.putText(
+            frame,
+            label,
+            (x1,y1-10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0,0,255),
+            2
+        )
 
         cv2.putText(
             frame,
@@ -122,21 +185,48 @@ while True:
             3
         )
 
-        # draw box ONLY for objects on track
-        cv2.rectangle(frame,(x1,y1),(x2,y2),(0,0,255),2)
+    # -----------------------------
+    # Motion Detection
+    # -----------------------------
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (9,9), 0)
 
-        cv2.putText(
-            frame,
-            f"{name} {conf:.2f}",
-            (x1,y1-10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (0,0,255),
-            2
-        )
+    if previous_frame is None:
+        previous_frame = gray.copy()
+        continue
 
-    # draw track polygon
-    cv2.polylines(frame,[roi],True,(255,0,0),2)
+    frame_diff = cv2.absdiff(previous_frame, gray)
+
+    thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)[1]
+    thresh = cv2.dilate(thresh, None, iterations=2)
+
+    contours, _ = cv2.findContours(
+        thresh,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    for contour in contours:
+
+        if cv2.contourArea(contour) < 500:
+            continue
+
+        x,y,w,h = cv2.boundingRect(contour)
+
+        if box_intersects_roi((x,y,x+w,y+h), roi) and not object_detected:
+
+            if time.time() - last_alert_time.get("motion",0) > alert_cooldown:
+
+                print("[ MOTION ] Movement detected near railway track")
+
+                last_alert_time["motion"] = time.time()
+
+    previous_frame = gray.copy()
+
+    # -----------------------------
+    # Draw ONLY the actual track
+    # -----------------------------
+    cv2.polylines(frame,[roi_original],True,(255,0,0),2)
 
     cv2.imshow("Railway Safety System", frame)
 

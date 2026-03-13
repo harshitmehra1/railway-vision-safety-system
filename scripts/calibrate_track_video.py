@@ -6,7 +6,7 @@ import os
 # -----------------------------
 # Select video
 # -----------------------------
-video_path = "./videos/video5.mp4"
+video_path = "./videos/video2.mp4"
 
 # automatically extract video name
 video_name = os.path.splitext(os.path.basename(video_path))[0]

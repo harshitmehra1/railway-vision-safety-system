@@ -5,13 +5,13 @@ import time
 # ---------------------------
 # Load models
 # ---------------------------
-rail_model = YOLO("best.pt")
-object_model = YOLO("yolov8s.pt")
+rail_model = YOLO("./models/best.pt")
+object_model = YOLO("./models/yolov8s.pt")
 
 # ---------------------------
 # Open video
 # ---------------------------
-cap = cv2.VideoCapture("video4.mp4")
+cap = cv2.VideoCapture("./videos/video4.mp4")
 
 frame_skip = 2
 frame_count = 0

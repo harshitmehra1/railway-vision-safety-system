@@ -4,8 +4,8 @@ import cv2
 # -----------------------------
 # Load models
 # -----------------------------
-rail_model = YOLO("best.pt")        # your trained rail detector
-object_model = YOLO("yolov8n.pt")   # pretrained object detector
+rail_model = YOLO("./models/best.pt")        # your trained rail detector
+object_model = YOLO("./models/yolov8n.pt")   # pretrained object detector
 
 
 # -----------------------------
